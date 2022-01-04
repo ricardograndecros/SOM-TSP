@@ -8,14 +8,13 @@ A Travelling Salesman Problem approach using Self Organized Maps
 import math
 
 import numpy as np
-import matplotlib.pyplot as plt
 from tools import read_file
 from plotter import plot_network, plot_network2, generate_gif
 
 
 class KohonenTSP:
 
-    def __init__(self, directory, filename, num_iterations, initial_learning_rate):
+    def __init__(self, directory, filename, distance_equation, num_iterations, initial_learning_rate):
         """
         Constructor that initializes main SOM properties
         :param directory:
@@ -29,7 +28,7 @@ class KohonenTSP:
         # initialize cities array, it will be later modified @ parse_tsp
         self.cities = np.ndarray((1,))
         self.dimension = 0
-        self.distance_equation = ""
+        self.distance_equation = distance_equation
         # stores training iterations
         self.iterations = num_iterations
 
@@ -39,12 +38,13 @@ class KohonenTSP:
         self.cities_normalized = self.normalize(self.cities)
 
         # initialize KSOM with 2*n prototypes
-        self.KSOM = np.random.rand(self.dimension * 2, 2)  # 2,m dimension for 2D TSP
+        # self.KSOM = np.random.rand(self.dimension, 2)  # 2,m dimension for 2D TSP
+        self.KSOM = np.random.uniform(low=0.25, high=0.3, size=(self.dimension, 2))
 
         # Based on Zhang W., W. Jianwu, A deterministic self-organizing map approach and its application
         # on satellite data based cloud type classification, initial radius can be calculated as min(rows, columns)/2
         # self.initial_radius = min(self.dimension, 2) / 2
-        self.initial_radius = 0.5
+        self.initial_radius = 0.05
         self.initial_learning_rate = initial_learning_rate
 
         self.image_names = []
@@ -57,10 +57,14 @@ class KohonenTSP:
         """
         distances = []
         if self.distance_equation == 'euclidean':
-            distances = np.sqrt(np.sum((np.square(self.KSOM - value)), axis=1))
+            # distances = np.sqrt(np.sum((np.square(value - self.KSOM))))
+            for s0, s1 in self.KSOM:
+                dist_ = math.sqrt((value[0] - s0) ** 2 + (value[1] - s1) ** 2)  # Edit this line to [0]s and [1]s
+                # print(dist)
+                distances.append(dist_)  # Save data to list
         if self.distance_equation == 'scalar_product':
             distances = np.sum(self.KSOM * value, axis=1)
-        return distances
+        return np.array(distances, dtype=np.double)
 
     def compute_neighbourhood(self, iteration, winner):
         """
@@ -82,7 +86,7 @@ class KohonenTSP:
         :return:
         """
         return value * np.exp(iteration / self.iterations) if variable_name == 'learning_rate' \
-            else value * np.exp(- iteration / self.iterations)
+            else value * np.exp(-iteration / self.iterations*10)
 
     def normalize(self, vector):
         """
@@ -108,20 +112,34 @@ class KohonenTSP:
         # execute for n iterations
         for i in range(self.iterations):
             # sample a random city
-            input_index = np.random.choice(tsp.cities.shape[0], size=1, replace=False)
+            input_index = np.random.choice(tsp.cities.shape[0], size=1, replace=False)[0]
             city = self.cities_normalized[input_index]
             # obtain winner for the city sampled
             winner = np.argmin(self.compute_distances(city))
             # update weight vectors based on neighbourhood
             # w(t+1) = w(t) + lr(t)*g(t,x)*(x - w(t))
-            self.KSOM += lr * self.compute_neighbourhood(i, winner)[:, np.newaxis] * (city - self.KSOM)
+            #print("-------- PRE --------")
+            #print("pre: ", self.KSOM[0])
+            #print("learning_rate: ", lr, " ---- neighbourhood: ", self.compute_neighbourhood(i, winner)[0], " ---- subtraction: ", (city - self.KSOM)[0])
+            #print("increment: ", (lr * self.compute_neighbourhood(i, winner)[:, np.newaxis] * (city - self.KSOM)))
+            self.KSOM += (lr * self.compute_neighbourhood(i, winner)[:, np.newaxis] * (city - self.KSOM))
+
+            #print("result: ", self.KSOM[0])
+            #self.KSOM += (lr/self.compute_distances(self.KSOM[winner]))[:, np.newaxis] * (city - self.KSOM)
+
+            # Solución sin vecindario
+            #incremento = lr * (city - self.KSOM[winner])
+            #print("incremento: ", incremento, " --- lr: ", lr, " --- city[0]: ", city, " --- ksom: ", self.KSOM[winner])
+            #self.KSOM[winner][0] = self.KSOM[winner][0] + incremento[0]
+            #self.KSOM[winner][1] = self.KSOM[winner][1] + incremento[1]
+
             # update learning rate
             lr = self.compute_decay(self.initial_learning_rate, i, 'learning_rate')
 
             if not i % 1000:
                 # progress print
                 print("{} iterations completed".format(i))
-            if not i % 10:
+            if not i % 100:
                 # plot every 10 iterations to make an animation
                 image_name = f"image_{i}.png"
                 self.image_names.append(image_name)
@@ -130,6 +148,7 @@ class KohonenTSP:
         # print("POST: ", self.KSOM)
         print("Training completed. {} iterations executed".format(self.iterations))
         generate_gif(self.image_names)
+        print(self.KSOM)
 
     def parse_tsp(self, path):
         """
@@ -141,11 +160,6 @@ class KohonenTSP:
         content = read_file(path)
         # save problem name
         self.name = [attribute.partition('NAME:')[2] for attribute in content if 'NAME:' in attribute][0].strip()
-        # save distance type
-        self.distance_equation = "euclidean" if ([attribute.partition('EDGE_WEIGHT_TYPE:')[2]
-                                                  for attribute in content if 'EDGE_WEIGHT_TYPE:' in attribute][
-                                                     0].strip() == 'EUC_2D') \
-            else "scalar_product"
 
         self.dimension = int([line.partition('DIMENSION:')[2] for line in content if 'DIMENSION: ' in line][0])
         index_for_search = [index for index, line in enumerate(content) if 'NODE_COORD_SECTION' in line][0] + 1
@@ -159,5 +173,5 @@ class KohonenTSP:
 
 # ===================================================
 # testing area
-tsp = KohonenTSP("ALL_tsp", "burma14.tsp", 1500, 0.01)
+tsp = KohonenTSP("ALL_tsp", "burma14.tsp", "euclidean", 10000, 0.01)
 tsp.train_KSOM()

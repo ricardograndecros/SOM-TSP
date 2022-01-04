@@ -18,8 +18,8 @@ def plot_network(cities, network, name='diagram.png'):
     :param name:
     :return:
     """
-    plt.xlim([0, 1])
-    plt.ylim([0, 1])
+    plt.xlim([0, 2])
+    plt.ylim([0, 2])
     plt.scatter(cities[:, 0], cities[:, 1], s=2)
     plt.scatter(network[:, 0], network[:, 1], s=2)
     plt.savefig(f"./tmp/{name}", bbox_inches='tight', pad_inches=0, dpi=200)

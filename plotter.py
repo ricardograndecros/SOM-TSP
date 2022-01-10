@@ -18,10 +18,28 @@ def plot_network(cities, network, name='diagram.png'):
     :param name:
     :return:
     """
-    plt.xlim([0, 2])
-    plt.ylim([0, 2])
+    plt.xlim([0, 1])
+    plt.ylim([0, 1])
     plt.scatter(cities[:, 0], cities[:, 1], s=2)
     plt.scatter(network[:, 0], network[:, 1], s=2)
+    plt.savefig(f"./tmp/{name}", bbox_inches='tight', pad_inches=0, dpi=200)
+    plt.close()
+
+
+def plot_neighbours(cities, network, problem, lr, cycle, cycles, name='diagram.png'):
+    plt.figure(figsize=(5,5))
+    plt.xlim([0, 1])
+    plt.ylim([0, 1])
+    plt.scatter(cities[:, 0], cities[:, 1], s=2)
+    plt.scatter(network[:, 0], network[:, 1], s=2, c='orange')
+
+    plt.suptitle(f"SOM TSP - {problem}")
+    plt.title(f"Cycle: {cycle}/{cycles} - Learning rate: {round(lr, 4)} - Cities: {len(cities)}")
+    plt.ylabel('Y')
+    plt.xlabel('X')
+    for i in range(len(network)):
+        plt.plot([network[i][0], network[(i+1) % len(network)][0]],
+                 [network[i][1], network[(i+1) % len(network)][1]], c='red')
     plt.savefig(f"./tmp/{name}", bbox_inches='tight', pad_inches=0, dpi=200)
     plt.close()
 
